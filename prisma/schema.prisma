@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Case {
+  id               String     @id @default(uuid())
+  bed              String
+  transcript       String
+  status           String     @default("PENDING")
+  priority         String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  closedAt         DateTime?
+  createdBy        String?
+  sensitiveWarning Boolean    @default(false)
+  deletedAt        DateTime?
+  auditLogs        AuditLog[]
+
+  @@index([bed])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  action    String
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+  actor     String?
+
+  @@index([caseId])
+  @@index([createdAt])
+}
