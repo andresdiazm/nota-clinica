@@ -3,7 +3,7 @@ import { ShieldCheck } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default function SettingsPage() {
-  const hasKey = Boolean(process.env.OPENAI_API_KEY);
+  const hasKey = Boolean(process.env.GROQ_API_KEY);
 
   return (
     <div className="space-y-5">
@@ -33,7 +33,7 @@ export default function SettingsPage() {
         <h2 className="text-base font-semibold text-zinc-950">Modo de transcripcion</h2>
         <p className="mt-2">
           Estado actual:{" "}
-          <span className="font-semibold text-zinc-950">{hasKey ? "real con OPENAI_API_KEY" : "mock local"}</span>.
+          <span className="font-semibold text-zinc-950">{hasKey ? "real con GROQ_API_KEY" : "mock local"}</span>.
         </p>
       </section>
 

@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Audio requerido" }, { status: 400 });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
 
   if (!apiKey) {
     const mockText =
@@ -26,10 +26,11 @@ export async function POST(request: Request) {
   try {
     const body = new FormData();
     body.append("file", audio, audio.name || "voice-note.webm");
-    body.append("model", "whisper-1");
+    body.append("model", "whisper-large-v3-turbo");
     body.append("language", "es");
+    body.append("response_format", "json");
 
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
-      console.error("OpenAI error", response.status, JSON.stringify(errorBody));
+      console.error("Groq error", response.status, JSON.stringify(errorBody));
       return NextResponse.json({ error: "No se pudo transcribir el audio" }, { status: 502 });
     }
 
