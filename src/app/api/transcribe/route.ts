@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   try {
     const body = new FormData();
     body.append("file", audio, audio.name || "voice-note.webm");
-    body.append("model", "gpt-4o-mini-transcribe");
+    body.append("model", "whisper-1");
     body.append("language", "es");
 
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
