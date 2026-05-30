@@ -30,6 +30,7 @@ export default function NewCasePage() {
   const [bed, setBed] = useState("");
   const [transcript, setTranscript] = useState("");
   const [recorderState, setRecorderState] = useState<RecorderState>("ready");
+  const [bedAutoDetected, setBedAutoDetected] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -64,6 +65,7 @@ export default function NewCasePage() {
       if (!response.ok) throw new Error(data.error ?? "No se pudo transcribir");
       setTranscript((data.transcript ?? "").slice(0, 1000));
       setMode(data.mode ?? null);
+      if (data.bed) { setBed(data.bed); setBedAutoDetected(true); }
       setRecorderState("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo transcribir");
@@ -126,6 +128,7 @@ export default function NewCasePage() {
     setTranscript("");
     setMode(null);
     setRecorderState("ready");
+    setBedAutoDetected(false);
     setError("");
   }
 
@@ -161,15 +164,18 @@ export default function NewCasePage() {
         No mencione nombre, RUT ni otros datos identificatorios. Solo una nota breve por cama.
       </div>
 
-      <label className="block space-y-2">
+      <div className="space-y-2">
         <span className="text-sm font-semibold text-zinc-800">Cama</span>
         <input
           value={bed}
-          onChange={(e) => setBed(e.target.value)}
+          onChange={(e) => { setBed(e.target.value); setBedAutoDetected(false); }}
           placeholder="601-2, 604/1, UTI-7, NEO 3"
           className="h-12 w-full rounded-md border border-zinc-300 bg-white px-3 text-lg font-semibold uppercase outline-none focus:border-zinc-900"
         />
-      </label>
+        {bedAutoDetected ? (
+          <p className="text-xs text-emerald-700">✓ Detectada automaticamente desde la nota de voz</p>
+        ) : null}
+      </div>
 
       <section className="rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
