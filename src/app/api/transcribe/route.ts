@@ -38,6 +38,8 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      console.error("OpenAI error", response.status, JSON.stringify(errorBody));
       return NextResponse.json({ error: "No se pudo transcribir el audio" }, { status: 502 });
     }
 
