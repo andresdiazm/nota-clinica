@@ -211,7 +211,6 @@ export default function NewCasePage() {
               ref={fileInputRef}
               type="file"
               accept="audio/*"
-              capture="microphone"
               onChange={handleFileUpload}
               className="absolute inset-0 cursor-pointer opacity-0"
               disabled={recorderState === "processing" || recorderState === "recording"}
