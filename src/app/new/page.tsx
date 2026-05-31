@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, RotateCcw, Save, Square, Trash2, Upload } from "lucide-react";
+import { Mic, RotateCcw, Save, Square, Trash2 } from "lucide-react";
 import { SensitiveAlert } from "@/components/SensitiveAlert";
 
 type RecorderState = "ready" | "recording" | "processing" | "done";
@@ -25,20 +25,23 @@ function mimeToExtension(mime: string): string {
   return "webm";
 }
 
+const CAMAS = ["1", "2", "3", "4", "5", "6"];
+
 export default function NewCasePage() {
   const router = useRouter();
-  const [bed, setBed] = useState("");
+  const [sala, setSala] = useState("");
+  const [cama, setCama] = useState("");
   const [transcript, setTranscript] = useState("");
   const [recorderState, setRecorderState] = useState<RecorderState>("ready");
-  const [bedAutoDetected, setBedAutoDetected] = useState(false);
+  const [autoDetected, setAutoDetected] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const canSave = bed.trim().length > 0 && transcript.trim().length > 0 && transcript.length <= 1000;
+  const bed = sala.trim() && cama ? `${sala.trim().toUpperCase()}-${cama}` : "";
+  const canSave = bed.length > 0 && transcript.trim().length > 0 && transcript.length <= 1000;
   const countStyle = transcript.length > 1000 ? "text-red-700" : "text-zinc-500";
 
   const helperText = {
@@ -63,9 +66,13 @@ export default function NewCasePage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "No se pudo transcribir");
+
       setTranscript((data.transcript ?? "").slice(0, 1000));
       setMode(data.mode ?? null);
-      if (data.bed) { setBed(data.bed); setBedAutoDetected(true); }
+
+      if (data.sala) { setSala(data.sala); setAutoDetected(true); }
+      if (data.cama) { setCama(data.cama); setAutoDetected(true); }
+
       setRecorderState("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo transcribir");
@@ -75,11 +82,10 @@ export default function NewCasePage() {
 
   async function startRecording() {
     setError("");
-
     const mimeType = getSupportedMimeType();
 
     if (!mimeType) {
-      setError("Este navegador no soporta grabacion de audio. Use el boton de subir archivo.");
+      setError("Este navegador no soporta grabacion de audio.");
       return;
     }
 
@@ -106,7 +112,7 @@ export default function NewCasePage() {
       if (err instanceof DOMException && err.name === "NotAllowedError") {
         setError("Permiso de microfono denegado. Revise los permisos del sitio en su navegador.");
       } else {
-        setError("No se pudo acceder al microfono. Intente subir un archivo de audio.");
+        setError("No se pudo acceder al microfono.");
       }
     }
   }
@@ -116,19 +122,13 @@ export default function NewCasePage() {
     setRecorderState("processing");
   }
 
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError("");
-    await sendAudioForTranscription(file, file.type || "audio/mp4");
-    e.target.value = "";
-  }
-
   function reset() {
     setTranscript("");
     setMode(null);
     setRecorderState("ready");
-    setBedAutoDetected(false);
+    setAutoDetected(false);
+    setSala("");
+    setCama("");
     setError("");
   }
 
@@ -164,19 +164,7 @@ export default function NewCasePage() {
         No mencione nombre, RUT ni otros datos identificatorios. Solo una nota breve por cama.
       </div>
 
-      <div className="space-y-2">
-        <span className="text-sm font-semibold text-zinc-800">Cama</span>
-        <input
-          value={bed}
-          onChange={(e) => { setBed(e.target.value); setBedAutoDetected(false); }}
-          placeholder="601-2, 604/1, UTI-7, NEO 3"
-          className="h-12 w-full rounded-md border border-zinc-300 bg-white px-3 text-lg font-semibold uppercase outline-none focus:border-zinc-900"
-        />
-        {bedAutoDetected ? (
-          <p className="text-xs text-emerald-700">✓ Detectada automaticamente desde la nota de voz</p>
-        ) : null}
-      </div>
-
+      {/* Grabacion */}
       <section className="rounded-md border border-zinc-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -190,12 +178,12 @@ export default function NewCasePage() {
           ) : null}
         </div>
 
-        <div className="mt-4 grid gap-3">
+        <div className="mt-4">
           {recorderState === "recording" ? (
             <button
               type="button"
               onClick={stopRecording}
-              className="flex min-h-16 items-center justify-center gap-2 rounded-md bg-red-700 px-4 text-base font-semibold text-white"
+              className="flex min-h-16 w-full items-center justify-center gap-2 rounded-md bg-red-700 px-4 text-base font-semibold text-white"
             >
               <Square size={22} aria-hidden />
               Detener grabacion
@@ -205,30 +193,58 @@ export default function NewCasePage() {
               type="button"
               onClick={startRecording}
               disabled={recorderState === "processing"}
-              className="flex min-h-16 items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-base font-semibold text-white disabled:opacity-50"
+              className="flex min-h-16 w-full items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 text-base font-semibold text-white disabled:opacity-50"
             >
               <Mic size={24} aria-hidden />
-              Grabar
+              {recorderState === "processing" ? "Procesando..." : "Grabar"}
             </button>
           )}
-
-          <div className="relative">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="audio/*"
-              onChange={handleFileUpload}
-              className="absolute inset-0 cursor-pointer opacity-0"
-              disabled={recorderState === "processing" || recorderState === "recording"}
-            />
-            <div className="flex min-h-12 items-center justify-center gap-2 rounded-md border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700">
-              <Upload size={18} aria-hidden />
-              Subir audio / grabar con app del cel
-            </div>
-          </div>
         </div>
       </section>
 
+      {/* Validacion sala-cama */}
+      <section className="rounded-md border border-zinc-200 bg-white p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-zinc-900">Ubicacion</p>
+          {autoDetected ? (
+            <span className="text-xs text-emerald-700 font-medium">✓ Detectada automaticamente</span>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-zinc-500">Sala</label>
+            <input
+              value={sala}
+              onChange={(e) => { setSala(e.target.value); setAutoDetected(false); }}
+              placeholder="601, UTI, NEO"
+              className="h-12 w-full rounded-md border border-zinc-300 bg-white px-3 text-base font-semibold uppercase outline-none focus:border-zinc-900"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-zinc-500">Cama (1-6)</label>
+            <select
+              value={cama}
+              onChange={(e) => { setCama(e.target.value); setAutoDetected(false); }}
+              className="h-12 w-full rounded-md border border-zinc-300 bg-white px-3 text-base font-semibold outline-none focus:border-zinc-900"
+            >
+              <option value="">—</option>
+              {CAMAS.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {bed ? (
+          <div className="rounded-md bg-zinc-50 border border-zinc-200 px-4 py-3 flex items-center justify-between">
+            <span className="text-xs text-zinc-500">Identificador final</span>
+            <span className="text-xl font-bold tracking-wide text-zinc-950">{bed}</span>
+          </div>
+        ) : null}
+      </section>
+
+      {/* Transcripcion */}
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <label htmlFor="transcript" className="text-sm font-semibold text-zinc-800">

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { sensitiveWarningReasons } from "@/lib/privacy";
 
-async function extractBed(transcript: string, apiKey: string): Promise<string | null> {
+type BedExtraction = { sala: string | null; cama: string | null };
+
+async function extractBed(transcript: string, apiKey: string): Promise<BedExtraction> {
+  const empty: BedExtraction = { sala: null, cama: null };
   try {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -12,16 +15,17 @@ async function extractBed(transcript: string, apiKey: string): Promise<string | 
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         temperature: 0,
-        max_tokens: 20,
+        max_tokens: 40,
         messages: [
           {
             role: "system",
             content:
-              "Eres un extractor de identificadores de cama hospitalaria. " +
-              "Extrae el identificador de cama del texto clinico. " +
-              "Puede ser: numero de cama (601-2, 604/1), unidad con numero (UTI-7, UTI 7, NEO 3, NEO-3), sala con numero (sala 3). " +
-              "Responde SOLO con el identificador corto y estandarizado (ej: '601-2', 'UTI-7', 'NEO-3', 'SALA-3'). " +
-              "Si no se menciona ninguna cama responde exactamente: null"
+              "Eres un extractor de ubicacion hospitalaria. " +
+              "Del texto clinico extrae: sala (puede ser numerica como 601, 604, o alfanumerica como UTI, NEO, UCI, PEDIATRIA) " +
+              "y numero de cama (siempre un numero del 1 al 6). " +
+              "Responde SOLO con JSON valido, sin explicaciones: " +
+              "{\"sala\": \"UTI\", \"cama\": \"3\"} " +
+              "Si no se detecta sala o cama usa null: {\"sala\": null, \"cama\": null}"
           },
           {
             role: "user",
@@ -31,16 +35,19 @@ async function extractBed(transcript: string, apiKey: string): Promise<string | 
       })
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) return empty;
 
     const data = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
     };
     const raw = data.choices?.[0]?.message?.content?.trim() ?? "";
-    if (!raw || raw.toLowerCase() === "null") return null;
-    return raw.slice(0, 40);
+    const parsed = JSON.parse(raw) as BedExtraction;
+    return {
+      sala: parsed.sala ? String(parsed.sala).toUpperCase().trim().slice(0, 20) : null,
+      cama: parsed.cama ? String(parsed.cama).trim().slice(0, 2) : null
+    };
   } catch {
-    return null;
+    return empty;
   }
 }
 
@@ -61,6 +68,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       transcript: mockText,
       bed: "UTI-3",
+      sala: "UTI",
+      cama: "3",
       mode: "mock",
       sensitiveWarning: false,
       warningReasons: []
@@ -91,11 +100,14 @@ export async function POST(request: Request) {
     const result = (await response.json()) as { text?: string };
     const transcript = result.text?.trim() ?? "";
 
-    const bed = await extractBed(transcript, apiKey);
+    const { sala, cama } = await extractBed(transcript, apiKey);
+    const bed = sala && cama ? `${sala}-${cama}` : null;
 
     return NextResponse.json({
       transcript,
       bed,
+      sala,
+      cama,
       mode: "real",
       sensitiveWarning: sensitiveWarningReasons(transcript).length > 0,
       warningReasons: sensitiveWarningReasons(transcript)
